@@ -9,6 +9,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from i18n import t  # noqa: E402
+
 CONFIG = Path(__file__).resolve().parent.parent / "gears.json"
 
 
@@ -43,15 +46,15 @@ def classify(prompt, cfg=None):
                 if re.search(r"(?<!\w)" + re.escape(k.lower()), low)]
         if hits:
             gear = g
-            reasons.append("mots-clés: " + ", ".join(hits[:3]))
+            reasons.append(t("kw", x=", ".join(hits[:3])))
             break
     if gear is None:
         if len(text) < cfg.get("short_prompt_chars", 40):
             gear = 1
-            reasons.append("prompt très court")
+            reasons.append(t("short"))
         else:
             gear = cfg.get("default_gear", 2)
-            reasons.append("aucun signal fort")
+            reasons.append(t("nosignal"))
 
     # 2) Signaux qui ne peuvent que monter la vitesse.
     def bump(min_gear, why):
@@ -62,22 +65,22 @@ def classify(prompt, cfg=None):
 
     n = len(text)
     for g in (4, 3):
-        t = cfg.get("length_chars", {}).get(str(g))
-        if t and n >= t:
-            bump(g, f"longueur {n} car.")
+        lim = cfg.get("length_chars", {}).get(str(g))
+        if lim and n >= lim:
+            bump(g, t("length", n=n))
             break
 
     exts = "|".join(re.escape(e) for e in cfg.get("file_extensions", []))
     if exts:
         files = set(re.findall(r"[\w\-./\\]*\w\.(?:" + exts + r")(?!\w)", low))
         for g in (4, 3):
-            t = cfg.get("files_mentioned", {}).get(str(g))
-            if t and len(files) >= t:
-                bump(g, f"{len(files)} fichiers mentionnés")
+            lim = cfg.get("files_mentioned", {}).get(str(g))
+            if lim and len(files) >= lim:
+                bump(g, t("files", n=len(files)))
                 break
 
     if any(re.search(p, text, re.M) for p in cfg.get("stack_trace_patterns", [])):
-        bump(cfg.get("stack_trace_gear", 3), "stack trace détectée")
+        bump(cfg.get("stack_trace_gear", 3), t("trace"))
 
     return decision(cfg, gear, " ; ".join(reasons))
 

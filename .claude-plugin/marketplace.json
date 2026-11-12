@@ -5,7 +5,7 @@
     {
       "name": "gearbox",
       "source": "./",
-      "description": "Changement de vitesse automatique entre modèles Claude selon la complexité du prompt."
+      "description": "Automatic gear shifting between Claude models based on prompt complexity."
     }
   ]
 }

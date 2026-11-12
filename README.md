@@ -36,7 +36,7 @@ To try it without installing: `claude --plugin-dir ./gearbox`
 
 1. The `UserPromptSubmit` hook sends your prompt to `scripts/classify.py`.
 2. The classifier returns `{gear, model, effort, reason}` based on `gears.json`.
-3. The hook injects one line of context: `[gearbox] vitesse 2 (auto) → déléguer à l'agent gearbox:gear-sonnet …`.
+3. The hook injects one line of context: `[gearbox] gear 2 (auto) → delegate to agent gearbox:gear-sonnet …`.
 4. The main session delegates the work to that agent, which runs on its own model.
 
 Commands:
@@ -45,6 +45,10 @@ Commands:
 - `/gear-why` — show the decision and the reason for the last prompt.
 
 State is stored in `~/.claude/gearbox/state.json`.
+
+## Language
+
+Messages (the injected context line, `/gear` and `/gear-why` output, reasons) are shown in French when the system language is French, and in English otherwise. Set the `GEARBOX_LANG` environment variable to `en` or `fr` to override. Agent prompts are in English; agents answer in the user's language.
 
 ## Customising `gears.json`
 
@@ -66,4 +70,3 @@ If you change the model of a gear, also change `model:` in the matching `agents/
 - The agents' `effort:` field depends on your Claude Code version; if it is ignored, the effort guidance in each agent's system prompt still applies.
 - The classifier is purely heuristic and will misjudge ambiguous prompts; use `/gear` to override.
 - Prompts starting with `/` (slash commands) are not classified.
-- The injected context line, agent prompts and command output are currently written in French.

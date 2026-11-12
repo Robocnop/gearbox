@@ -46,6 +46,10 @@ Commandes :
 
 L'état est stocké dans `~/.claude/gearbox/state.json`.
 
+## Langue
+
+Les messages (ligne de contexte injectée, sortie de `/gear` et `/gear-why`, raisons) s'affichent en français quand la langue du système est le français, et en anglais sinon. La variable d'environnement `GEARBOX_LANG` (`en` ou `fr`) permet de forcer la langue. Les prompts des agents sont en anglais ; les agents répondent dans la langue de l'utilisateur.
+
 ## Modifier `gears.json`
 
 - `gears` : modèle, agent et effort de chaque vitesse.
@@ -66,4 +70,3 @@ Si tu changes le modèle d'une vitesse, change aussi `model:` dans le fichier `a
 - Le champ `effort:` des agents dépend de la version de Claude Code ; s'il est ignoré, la consigne d'effort du prompt système de chaque agent reste active.
 - Le classifieur est purement heuristique et se trompe sur les prompts ambigus ; utilise `/gear` pour corriger.
 - Les prompts commençant par `/` (slash commands) ne sont pas classés.
-- La ligne de contexte injectée, les prompts des agents et la sortie des commandes sont pour l'instant en français.

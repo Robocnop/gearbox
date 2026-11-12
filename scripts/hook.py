@@ -14,6 +14,7 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import classify
     import gear
+    from i18n import t
 
     data = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace") or "{}")
     prompt = (data.get("prompt") or "").strip()
@@ -24,7 +25,7 @@ def main():
     state = gear.load_state()
     forced = state.get("forced")
     if forced in (1, 2, 3, 4):
-        d = classify.decision(cfg, forced, "vitesse forcée via /gear", forced=True)
+        d = classify.decision(cfg, forced, t("forced_reason"), forced=True)
     else:
         d = classify.classify(prompt, cfg)
 
@@ -34,12 +35,7 @@ def main():
     except Exception:
         pass
 
-    ctx = (
-        f"[gearbox] vitesse {d['gear']} ({'forcée' if d['forced'] else 'auto'}) → déléguer à l'agent "
-        f"gearbox:{d['agent']} ({d['model_name']}), effort {d['effort']}. Raison : {d['reason']}. "
-        "Délègue l'exécution de cette demande à cet agent via l'outil Agent (brief complet et autonome), "
-        "sauf simple échange conversationnel ou refus explicite de l'utilisateur."
-    )
+    ctx = t("ctx", mode=t("mode_forced" if d["forced"] else "mode_auto"), **d)
     out = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}}
     sys.stdout.write(json.dumps(out))
 
