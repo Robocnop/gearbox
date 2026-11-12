@@ -9,7 +9,14 @@ Automatic gear shifting for Claude Code: every prompt is classified locally (zer
 | 1 | `gear-haiku` | Haiku 5.5 | low | typo, rename, formatting |
 | 2 | `gear-sonnet` | Sonnet 5.5 | medium | simple bug, tests, small refactor |
 | 3 | `gear-opus` | Opus 5.5 | high | architecture, multi-file changes, hard debugging |
-| 4 | `gear-fable` | Fable 5.2 | xhigh | system design, from scratch, security |
+| 4 | `gear-opus` (`gear-fable` if enabled) | Opus 5.5 (Fable 5.2) | high (xhigh) | system design, from scratch, security |
+
+Gear 0 means "no delegation": questions (ending with `?` or starting with what/how/why/quoi/comment/pourquoi…) and short prompts without an action verb. The hook injects nothing for them.
+
+Delegation rules:
+
+- gearbox never suggests an agent whose model ranks at or above your main model (Haiku < Sonnet < Opus < Fable), unless you forced the gear with `/gear`. Tell it which model you use with `main_model` in `gears.json` (`haiku`, `sonnet`, `opus`, `fable`; empty disables the check). Claude Code does not pass the active model to `UserPromptSubmit` hooks, so it cannot be detected automatically: update `main_model` when you switch models.
+- Gear 4 uses `gear-opus` by default. `gear-fable` is only used if `"allow_fable": true` in `gears.json`, or with `/gear 4`.
 
 ## Install
 
@@ -54,12 +61,14 @@ Messages (the injected context line, `/gear` and `/gear-why` output, reasons) ar
 
 - `gears`: model, agent and effort for each gear.
 - `keywords`: keywords per gear (matched at the start of a word, case-insensitive; the highest matching gear wins). English and French keywords are included.
+- `main_model` / `allow_fable`: see "Delegation rules" above.
+- `zero_gear`: gear 0 thresholds and word lists (`short_max_chars`, `question_max_chars`, `question_starters`, `action_verbs`).
 - `default_gear` / `short_prompt_chars`: gear used when no keyword matches (a very short prompt goes to gear 1).
 - `length_chars`, `files_mentioned`: thresholds that shift up to gear 3 or 4.
 - `file_extensions`: extensions counted as a "mentioned file".
 - `stack_trace_patterns` / `stack_trace_gear`: regexes that detect a stack trace, and the minimum gear it triggers.
 
-Test a rule: `echo "my prompt" | python scripts/classify.py`
+Test a rule: `echo "my prompt" | python scripts/classify.py`. Run the test suite: `python -m unittest discover tests`.
 
 If you change the model of a gear, also change `model:` in the matching `agents/gear-*.md`.
 

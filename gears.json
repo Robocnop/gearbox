@@ -7,6 +7,14 @@
   },
   "default_gear": 2,
   "short_prompt_chars": 40,
+  "main_model": "sonnet",
+  "allow_fable": false,
+  "zero_gear": {
+    "short_max_chars": 60,
+    "question_max_chars": 400,
+    "question_starters": ["quoi", "comment", "pourquoi", "quand", "quel", "quelle", "quels", "quelles", "qui", "est-ce", "what", "how", "why", "when", "where", "which", "who"],
+    "action_verbs": ["fix", "add", "create", "write", "make", "build", "implement", "refactor", "rename", "remove", "delete", "update", "change", "run", "test", "debug", "install", "generate", "optimi", "migrat", "corrige", "ajoute", "crée", "cree", "écris", "ecris", "fais", "implémente", "implemente", "supprime", "modifie", "lance", "teste", "renomme", "génère", "genere", "conçois", "concois", "construis", "installe", "migre"]
+  },
   "keywords": {
     "1": ["typo", "rename", "renomme", "format", "lint", "indent", "faute", "orthograph", "whitespace"],
     "2": ["bug", "test", "refactor", "erreur", "error", "implement", "implémente", "ajoute", "function", "fonction", "endpoint"],

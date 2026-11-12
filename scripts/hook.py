@@ -35,6 +35,9 @@ def main():
     except Exception:
         pass
 
+    if not d.get("delegate", True):
+        return
+
     ctx = t("ctx", mode=t("mode_forced" if d["forced"] else "mode_auto"), **d)
     out = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}}
     sys.stdout.write(json.dumps(out))

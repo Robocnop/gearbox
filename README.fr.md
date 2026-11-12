@@ -9,7 +9,14 @@ Boîte de vitesses automatique pour Claude Code : chaque prompt est classé loca
 | 1 | `gear-haiku` | Haiku 5.5 | low | typo, renommage, formatage |
 | 2 | `gear-sonnet` | Sonnet 5.5 | medium | bug simple, tests, petit refactor |
 | 3 | `gear-opus` | Opus 5.5 | high | architecture, multi-fichiers, débogage difficile |
-| 4 | `gear-fable` | Fable 5.2 | xhigh | conception système, from scratch, sécurité |
+| 4 | `gear-opus` (`gear-fable` si activé) | Opus 5.5 (Fable 5.2) | high (xhigh) | conception système, from scratch, sécurité |
+
+La vitesse 0 signifie « pas de délégation » : questions (finissant par `?` ou commençant par quoi/comment/pourquoi/what/how/why…) et prompts courts sans verbe d'action. Le hook n'injecte rien dans ce cas.
+
+Règles de délégation :
+
+- gearbox ne suggère jamais un agent dont le modèle est de rang égal ou supérieur à ton modèle principal (Haiku < Sonnet < Opus < Fable), sauf si tu as forcé la vitesse avec `/gear`. Indique ton modèle avec `main_model` dans `gears.json` (`haiku`, `sonnet`, `opus`, `fable` ; vide désactive la vérification). Claude Code ne transmet pas le modèle actif aux hooks `UserPromptSubmit`, il ne peut donc pas être détecté automatiquement : mets `main_model` à jour quand tu changes de modèle.
+- La vitesse 4 utilise `gear-opus` par défaut. `gear-fable` n'est utilisé que si `"allow_fable": true` dans `gears.json`, ou avec `/gear 4`.
 
 ## Installation
 
@@ -54,12 +61,14 @@ Les messages (ligne de contexte injectée, sortie de `/gear` et `/gear-why`, rai
 
 - `gears` : modèle, agent et effort de chaque vitesse.
 - `keywords` : mots-clés par vitesse (match en début de mot, insensible à la casse ; la vitesse la plus haute gagne). Des mots-clés anglais et français sont fournis.
+- `main_model` / `allow_fable` : voir « Règles de délégation » ci-dessus.
+- `zero_gear` : seuils et listes de mots de la vitesse 0 (`short_max_chars`, `question_max_chars`, `question_starters`, `action_verbs`).
 - `default_gear` / `short_prompt_chars` : vitesse utilisée sans mot-clé (un prompt très court part en vitesse 1).
 - `length_chars`, `files_mentioned` : seuils qui font monter en vitesse 3 ou 4.
 - `file_extensions` : extensions comptées comme « fichier mentionné ».
 - `stack_trace_patterns` / `stack_trace_gear` : regex de détection de stack trace, et vitesse minimale associée.
 
-Tester une règle : `echo "mon prompt" | python scripts/classify.py`
+Tester une règle : `echo "mon prompt" | python scripts/classify.py`. Lancer les tests : `python -m unittest discover tests`.
 
 Si tu changes le modèle d'une vitesse, change aussi `model:` dans le fichier `agents/gear-*.md` correspondant.
 

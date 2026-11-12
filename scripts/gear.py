@@ -57,7 +57,7 @@ def main(argv):
         print(t("none"))
         return
     print(t("why_last", at=last.get("at", "?"), prompt=repr(last.get("prompt", ""))))
-    print(t("why_gear", **last))
+    print(t("why_gear", **last) if last.get("agent") else t("why_nodeleg"))
     print(t("why_reason", reason=last["reason"]))
 
 

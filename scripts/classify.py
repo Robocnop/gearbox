@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from i18n import t  # noqa: E402
 
 CONFIG = Path(__file__).resolve().parent.parent / "gears.json"
+RANK = {"haiku": 1, "sonnet": 2, "opus": 3, "fable": 4}
 
 
 def load_config(path=CONFIG):
@@ -21,7 +22,19 @@ def load_config(path=CONFIG):
 
 
 def decision(cfg, gear, reason, forced=False):
-    g = cfg["gears"][str(gear)]
+    if gear == 0:
+        return {"gear": 0, "model": None, "model_name": None, "agent": None,
+                "effort": None, "reason": reason, "forced": forced, "delegate": False}
+    src = gear
+    if gear == 4 and not forced and not cfg.get("allow_fable"):
+        src = 3
+        reason += " ; " + t("fable_off")
+    g = cfg["gears"][str(src)]
+    delegate = True
+    main = cfg.get("main_model")
+    if not forced and main in RANK and RANK.get(g["model"], 0) >= RANK[main]:
+        delegate = False
+        reason += " ; " + t("capped", main=main, model=g.get("model_name", g["model"]))
     return {
         "gear": gear,
         "model": g["model"],
@@ -30,6 +43,7 @@ def decision(cfg, gear, reason, forced=False):
         "effort": g["effort"],
         "reason": reason,
         "forced": forced,
+        "delegate": delegate,
     }
 
 
@@ -38,6 +52,19 @@ def classify(prompt, cfg=None):
     text = prompt.strip()
     low = text.lower()
     reasons = []
+
+    # 0) Pas de délégation : question, ou prompt court sans verbe d'action.
+    z = cfg.get("zero_gear", {})
+    n = len(text)
+    starters = z.get("question_starters", [])
+    is_q = text.endswith("?") or any(
+        re.match(re.escape(s.lower()) + r"\b", low) for s in starters)
+    if is_q and n <= z.get("question_max_chars", 400):
+        return decision(cfg, 0, t("g0_question"))
+    verbs = z.get("action_verbs", [])
+    if n < z.get("short_max_chars", 60) and not any(
+            re.search(r"(?<!\w)" + re.escape(v.lower()), low) for v in verbs):
+        return decision(cfg, 0, t("g0_short"))
 
     # 1) Mots-clés : la vitesse la plus haute qui matche l'emporte (match en début de mot).
     gear = None
