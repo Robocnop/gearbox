@@ -1,0 +1,7 @@
+{
+  "name": "gearbox",
+  "version": "0.1.0",
+  "description": "Boîte de vitesses automatique : estime la complexité de chaque prompt et oriente vers le bon modèle (Haiku / Sonnet / Opus / Fable) et le bon niveau d'effort.",
+  "author": { "name": "Robocnop" },
+  "keywords": ["model-routing", "cost", "agents", "hooks"]
+}

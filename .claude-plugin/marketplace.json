@@ -1,0 +1,11 @@
+{
+  "name": "gearbox-local",
+  "owner": { "name": "Robocnop" },
+  "plugins": [
+    {
+      "name": "gearbox",
+      "source": "./",
+      "description": "Changement de vitesse automatique entre modèles Claude selon la complexité du prompt."
+    }
+  ]
+}

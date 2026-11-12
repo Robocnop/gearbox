@@ -1,0 +1,29 @@
+{
+  "gears": {
+    "1": { "model": "haiku",  "model_name": "Haiku 5.5",  "agent": "gear-haiku",  "effort": "low" },
+    "2": { "model": "sonnet", "model_name": "Sonnet 5.5", "agent": "gear-sonnet", "effort": "medium" },
+    "3": { "model": "opus",   "model_name": "Opus 5.5",   "agent": "gear-opus",   "effort": "high" },
+    "4": { "model": "fable",  "model_name": "Fable 5.2",  "agent": "gear-fable",  "effort": "xhigh" }
+  },
+  "default_gear": 2,
+  "short_prompt_chars": 40,
+  "keywords": {
+    "1": ["typo", "rename", "renomme", "format", "lint", "indent", "faute", "orthograph", "whitespace"],
+    "2": ["bug", "test", "refactor", "erreur", "error", "implement", "implémente", "ajoute", "function", "fonction", "endpoint"],
+    "3": ["architecture", "multi-fichier", "multi-file", "plusieurs fichiers", "multiple files", "across", "migration", "migrate", "performance", "optimi", "race condition", "deadlock", "memory leak", "fuite mémoire", "intermittent", "flaky", "concurren"],
+    "4": ["from scratch", "de zéro", "system design", "conception système", "conçois", "distributed", "distribué", "sécurité", "security", "vulnérab", "vulnerab", "threat model", "cryptograph", "preuve", "proof", "trade-off", "scalab"]
+  },
+  "length_chars": { "3": 800, "4": 2500 },
+  "files_mentioned": { "3": 3, "4": 7 },
+  "file_extensions": ["py", "js", "jsx", "ts", "tsx", "json", "md", "lua", "luau", "cs", "java", "kt", "go", "rs", "c", "h", "cpp", "hpp", "rb", "php", "html", "css", "scss", "sql", "sh", "ps1", "yml", "yaml", "toml", "xml", "vue", "swift"],
+  "stack_trace_gear": 3,
+  "stack_trace_patterns": [
+    "Traceback \\(most recent call last\\)",
+    "File \".+\", line \\d+",
+    "^\\s+at .+[(:]\\d+",
+    "Exception in thread",
+    "^panic: ",
+    "error\\[E\\d+\\]",
+    "stack traceback:"
+  ]
+}
