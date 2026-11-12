@@ -1,6 +1,6 @@
 {
   "name": "gearbox",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Automatic gear shifting: estimates the complexity of each prompt and routes it to the right model (Haiku / Sonnet / Opus / Fable) and effort level.",
   "author": { "name": "Robocnop" },
   "keywords": ["model-routing", "cost", "agents", "hooks"]

@@ -15,7 +15,8 @@ La vitesse 0 signifie « pas de délégation » : questions (finissant par `?` o
 
 Règles de délégation :
 
-- gearbox ne suggère jamais un agent dont le modèle est de rang égal ou supérieur à ton modèle principal (Haiku < Sonnet < Opus < Fable), sauf si tu as forcé la vitesse avec `/gear`. Indique ton modèle avec `main_model` dans `gears.json` (`haiku`, `sonnet`, `opus`, `fable` ; vide désactive la vérification). Claude Code ne transmet pas le modèle actif aux hooks `UserPromptSubmit`, il ne peut donc pas être détecté automatiquement : mets `main_model` à jour quand tu changes de modèle.
+- gearbox ne suggère jamais un agent dont le modèle est de rang égal ou supérieur à ton modèle principal (Haiku < Sonnet < Opus < Fable), sauf si tu as forcé la vitesse avec `/gear`.
+- **Priorité du modèle principal** : 1) *détecté* via les hooks `SessionStart` / `PostModelSwitch` (valable seulement pour la session où il a été vu), 2) réglé à la main avec `/gear main <haiku|sonnet|opus|fable|auto>`, 3) `main_model` dans `gears.json` (`haiku`, `sonnet`, `opus`, `fable` ; vide = inconnu, pas de limite de rang). `/gear-why` indique la source utilisée. `UserPromptSubmit` ne reçoit pas le modèle et `SessionStart` ne le fournit pas toujours, d'où ces solutions de repli.
 - La vitesse 4 utilise `gear-opus` par défaut. `gear-fable` n'est utilisé que si `"allow_fable": true` dans `gears.json`, ou avec `/gear 4`.
 
 ## Installation
@@ -49,9 +50,14 @@ Pour un essai sans installation : `claude --plugin-dir ./gearbox`
 Commandes :
 
 - `/gear <1-4|auto>` — force une vitesse, ou repasse en automatique.
+- `/gear main <haiku|sonnet|opus|fable|auto>` — règle ton modèle principal à la main (utilisé quand aucun n'est détecté).
 - `/gear-why` — affiche la décision et la raison du dernier prompt.
 
-L'état est stocké dans `~/.claude/gearbox/state.json`.
+## Fiabilité
+
+- **Fail-open** : si quoi que ce soit échoue dans le hook (exception, JSON invalide, fichier manquant, timeout de 3 s), il sort en silence et ton prompt passe sans contexte injecté.
+- **Config robuste** : `gears.json` est validé au chargement. Une clé manquante ou invalide prend une valeur par défaut codée en dur ; un fichier absent ou corrompu donne tous les défauts. Rien ne t'est affiché.
+- **Données locales, hors du plugin et du dépôt** : `~/.claude/gearbox/state.json` (vitesse forcée, modèle principal manuel et détecté, dernière décision) et `~/.claude/gearbox/gearbox.log` (erreurs et avertissements de config, plafonné à 200 lignes). `GEARBOX_HOME` permet de choisir un autre dossier. Regarde d'abord le log si gearbox semble ne rien faire.
 
 ## Langue
 
@@ -83,3 +89,7 @@ Si tu changes le modèle d'une vitesse, change aussi `model:` dans le fichier `a
 - Le champ `effort:` des agents dépend de la version de Claude Code ; s'il est ignoré, la consigne d'effort du prompt système de chaque agent reste active.
 - Le classifieur est purement heuristique et se trompe sur les prompts ambigus ; utilise `/gear` pour corriger.
 - Les prompts commençant par `/` (slash commands) ne sont pas classés.
+- La détection du modèle demande une version de Claude Code qui fournit le champ `model` de `SessionStart` et le hook `PostModelSwitch` ; sur une version plus ancienne, utilise `/gear main` ou `main_model`. Le format exact de la valeur n'est pas supposé : gearbox cherche seulement `haiku`, `sonnet`, `opus` ou `fable` dedans.
+- Les blocs de code et les stack traces sont ignorés pour les mots-clés et les négations simples sont gérées ; les phrases à négation complexe peuvent encore être mal jugées.
+
+Voir [CHANGELOG.md](CHANGELOG.md).

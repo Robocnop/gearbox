@@ -15,7 +15,8 @@ Gear 0 means "no delegation": questions (ending with `?` or starting with what/h
 
 Delegation rules:
 
-- gearbox never suggests an agent whose model ranks at or above your main model (Haiku < Sonnet < Opus < Fable), unless you forced the gear with `/gear`. Tell it which model you use with `main_model` in `gears.json` (`haiku`, `sonnet`, `opus`, `fable`; empty disables the check). Claude Code does not pass the active model to `UserPromptSubmit` hooks, so it cannot be detected automatically: update `main_model` when you switch models.
+- gearbox never suggests an agent whose model ranks at or above your main model (Haiku < Sonnet < Opus < Fable), unless you forced the gear with `/gear`.
+- **Main model priority**: 1) *detected* from the `SessionStart` / `PostModelSwitch` hooks (only valid for the session it was seen in), 2) set by hand with `/gear main <haiku|sonnet|opus|fable|auto>`, 3) `main_model` in `gears.json` (`haiku`, `sonnet`, `opus`, `fable`; empty means unknown, no rank limit). `/gear-why` shows which source was used. `UserPromptSubmit` itself does not receive the model, and `SessionStart` does not always provide it, hence the fallbacks.
 - Gear 4 uses `gear-opus` by default. `gear-fable` is only used if `"allow_fable": true` in `gears.json`, or with `/gear 4`.
 
 ## Install
@@ -49,9 +50,14 @@ To try it without installing: `claude --plugin-dir ./gearbox`
 Commands:
 
 - `/gear <1-4|auto>` — force a gear, or go back to automatic.
+- `/gear main <haiku|sonnet|opus|fable|auto>` — set your main model by hand (used when none is detected).
 - `/gear-why` — show the decision and the reason for the last prompt.
 
-State is stored in `~/.claude/gearbox/state.json`.
+## Reliability
+
+- **Fail-open**: if anything goes wrong in the hook (exception, invalid JSON, missing file, timeout of 3 s), it exits silently and your prompt goes through with no injected context.
+- **Robust config**: `gears.json` is validated on load. A missing or invalid key falls back to a built-in default; a missing or corrupt file falls back to all defaults. Nothing is shown to you.
+- **Local data, outside the plugin and the repo**: `~/.claude/gearbox/state.json` (forced gear, manual and detected main model, last decision) and `~/.claude/gearbox/gearbox.log` (errors and config warnings, capped at 200 lines). Set `GEARBOX_HOME` to use another folder. Look at the log first if gearbox seems to do nothing.
 
 ## Language
 
@@ -83,3 +89,7 @@ If you change the model of a gear, also change `model:` in the matching `agents/
 - The agents' `effort:` field depends on your Claude Code version; if it is ignored, the effort guidance in each agent's system prompt still applies.
 - The classifier is purely heuristic and will misjudge ambiguous prompts; use `/gear` to override.
 - Prompts starting with `/` (slash commands) are not classified.
+- Model detection needs a Claude Code version that provides the `SessionStart` `model` field and the `PostModelSwitch` hook; on older versions use `/gear main` or `main_model`. The exact format of the model value is not relied on: gearbox only looks for `haiku`, `sonnet`, `opus` or `fable` in it.
+- Code blocks and stack traces are ignored for keywords, and simple negations are handled; sentences with complex negations can still be misjudged.
+
+See [CHANGELOG.md](CHANGELOG.md).
