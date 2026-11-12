@@ -16,6 +16,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from i18n import t  # noqa: E402
 
 LOG_MAX_LINES = 200
+FAMILIES = ("haiku", "sonnet", "opus", "fable")  # ascending rank
+
+
+def family_of(model):
+    """Model family (haiku/sonnet/opus/fable) found in any model id or name, else None."""
+    s = model.lower() if isinstance(model, str) else json.dumps(model, default=str).lower()
+    return next((f for f in FAMILIES if f in s), None)
 
 
 def home():
@@ -77,7 +84,19 @@ def main(argv):
 
     if cmd == "set":
         arg = (argv[1] if len(argv) > 1 else "").strip().lower()
-        if arg == "auto":
+        if arg == "main":
+            fam = (argv[2] if len(argv) > 2 else "").strip().lower()
+            if fam == "auto":
+                state.pop("main_override", None)
+                save_state(state)
+                print(t("set_main_auto"))
+            elif fam in FAMILIES:
+                state["main_override"] = fam
+                save_state(state)
+                print(t("set_main", m=fam))
+            else:
+                print(t("usage", cur=cur))
+        elif arg == "auto":
             state.pop("forced", None)
             save_state(state)
             print(t("set_auto"))
@@ -97,6 +116,9 @@ def main(argv):
     print(t("why_last", at=last.get("at", "?"), prompt=repr(last.get("prompt", ""))))
     print(t("why_gear", **last) if last.get("agent") else t("why_nodeleg"))
     print(t("why_reason", reason=last.get("reason", "")))
+    src = last.get("main_source")
+    if src in ("detected", "manual", "config", "none"):
+        print(t("why_main", main=last.get("main") or "?", source=t("src_" + src)))
 
 
 if __name__ == "__main__":

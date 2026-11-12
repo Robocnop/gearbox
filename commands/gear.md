@@ -1,6 +1,6 @@
 ---
-description: Force the gearbox gear (1-4) or go back to automatic
-argument-hint: <1-4|auto>
+description: Force the gearbox gear (1-4), go back to automatic, or set the main model
+argument-hint: <1-4|auto> | main <haiku|sonnet|opus|fable|auto>
 allowed-tools: Bash(python:*)
 ---
 

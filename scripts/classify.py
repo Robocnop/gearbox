@@ -17,7 +17,7 @@ import gear  # noqa: E402
 from i18n import t  # noqa: E402
 
 CONFIG = Path(__file__).resolve().parent.parent / "gears.json"
-RANK = {"haiku": 1, "sonnet": 2, "opus": 3, "fable": 4}
+RANK = {f: i for i, f in enumerate(gear.FAMILIES, 1)}
 
 
 # Built-in defaults: used for any missing/invalid key, or when gears.json is unusable.
@@ -163,17 +163,36 @@ def load_config(path=None):
     return cfg
 
 
-def decision(cfg, gear, reason, forced=False):
+def _family(v):
+    return v if isinstance(v, str) and v in RANK else None
+
+
+def resolve_main(cfg, state, session_id=None):
+    """Main model family and its source. Priority: detected > /gear main > gears.json."""
+    state = state if isinstance(state, dict) else {}
+    det = state.get("detected")
+    if isinstance(det, dict) and _family(det.get("family")):
+        sid = det.get("session_id")
+        if not session_id or not sid or sid == session_id:
+            return det["family"], "detected"
+    if _family(state.get("main_override")):
+        return state["main_override"], "manual"
+    if _family(cfg.get("main_model")):
+        return cfg["main_model"], "config"
+    return None, "none"
+
+
+def decision(cfg, gear, reason, forced=False, main=None, main_source="none"):
     if gear == 0:
-        return {"gear": 0, "model": None, "model_name": None, "agent": None,
-                "effort": None, "reason": reason, "forced": forced, "delegate": False}
+        return {"gear": 0, "model": None, "model_name": None, "agent": None, "effort": None,
+                "reason": reason, "forced": forced, "delegate": False,
+                "main": main, "main_source": main_source}
     src = gear
     if gear == 4 and not forced and not cfg.get("allow_fable"):
         src = 3
         reason += " ; " + t("fable_off")
     g = cfg["gears"][str(src)]
     delegate = True
-    main = cfg.get("main_model")
     if not forced and main in RANK and RANK.get(g["model"], 0) >= RANK[main]:
         delegate = False
         reason += " ; " + t("capped", main=main, model=g.get("model_name", g["model"]))
@@ -186,6 +205,8 @@ def decision(cfg, gear, reason, forced=False):
         "reason": reason,
         "forced": forced,
         "delegate": delegate,
+        "main": main,
+        "main_source": main_source,
     }
 
 
@@ -229,8 +250,9 @@ def strip_negations(text, phrases):
     return re.sub(r"(?<!\w)(?:" + "|".join(alts) + r")(?:\s+[\w'-]+){1,2}", " ", text)
 
 
-def classify(prompt, cfg=None):
+def classify(prompt, cfg=None, state=None, session_id=None):
     cfg = cfg or load_config()
+    main, src = resolve_main(cfg, state, session_id)
     raw = prompt.strip()
     pats = cfg["stack_trace_patterns"]
     trace = has_trace(raw, pats)  # a stack trace is only a boolean signal
@@ -244,9 +266,9 @@ def classify(prompt, cfg=None):
     z = cfg["zero_gear"]
     is_q = clean.endswith("?") or any(re.match(re.escape(norm(s)) + r"\b", nk) for s in z["question_starters"])
     if is_q and n <= z["question_max_chars"]:
-        return decision(cfg, 0, t("g0_question"))
+        return decision(cfg, 0, t("g0_question"), main=main, main_source=src)
     if n < z["short_max_chars"] and not trace and not any(hit(kw, v) for v in z["action_verbs"]):
-        return decision(cfg, 0, t("g0_short"))
+        return decision(cfg, 0, t("g0_short"), main=main, main_source=src)
 
     # 1) Keywords: the highest matching gear wins.
     level = None
@@ -286,7 +308,7 @@ def classify(prompt, cfg=None):
     if trace:
         bump(cfg["stack_trace_gear"], t("trace"))
 
-    return decision(cfg, level, " ; ".join(reasons))
+    return decision(cfg, level, " ; ".join(reasons), main=main, main_source=src)
 
 
 if __name__ == "__main__":
@@ -295,4 +317,4 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-    print(json.dumps(classify(prompt), ensure_ascii=False))
+    print(json.dumps(classify(prompt, state=gear.load_state()), ensure_ascii=False))

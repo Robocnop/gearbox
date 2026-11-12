@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""gearbox — command hook (UserPromptSubmit).
+"""gearbox — command hook (UserPromptSubmit, SessionStart, PostModelSwitch).
+
+UserPromptSubmit : classify the prompt and inject one line of context.
+SessionStart / PostModelSwitch : record the active model family in the state file.
 
 Fail-open: any exception, invalid JSON, missing file or timeout => exit 0 with
 no output, so the prompt always goes through without injected context.
@@ -13,6 +16,28 @@ from pathlib import Path
 SCRIPTS = str(Path(__file__).resolve().parent)
 
 
+def now():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def on_model(data, event):
+    """Remember the active model (SessionStart: `model`, PostModelSwitch: `to_model`)."""
+    import gear
+
+    raw = data.get("to_model") if event == "PostModelSwitch" else data.get("model")
+    fam = gear.family_of(raw) if raw else None
+    sid = data.get("session_id")
+    state = gear.load_state()
+    if fam:
+        state["detected"] = {"family": fam, "raw": str(raw)[:80], "event": event,
+                             "session_id": sid, "at": now()}
+    elif event == "SessionStart" and sid and (state.get("detected") or {}).get("session_id") == sid:
+        return  # same session, model not provided this time: keep what we know
+    else:
+        state.pop("detected", None)  # never keep a stale model
+    gear.save_state(state)
+
+
 def on_prompt(data):
     import classify
     import gear
@@ -22,15 +47,17 @@ def on_prompt(data):
     if not prompt or prompt.startswith("/"):
         return None
 
+    sid = data.get("session_id")
     cfg = classify.load_config()
     state = gear.load_state()
     forced = state.get("forced")
     if forced in (1, 2, 3, 4):
-        d = classify.decision(cfg, forced, t("forced_reason"), forced=True)
+        main, src = classify.resolve_main(cfg, state, sid)
+        d = classify.decision(cfg, forced, t("forced_reason"), forced=True, main=main, main_source=src)
     else:
-        d = classify.classify(prompt, cfg)
+        d = classify.classify(prompt, cfg, state, sid)
 
-    state["last"] = dict(d, prompt=prompt[:120], at=time.strftime("%Y-%m-%d %H:%M:%S"))
+    state["last"] = dict(d, prompt=prompt[:120], at=now())
     try:
         gear.save_state(state)
     except Exception as e:
@@ -47,7 +74,11 @@ def main():
     data = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace") or "{}")
     if not isinstance(data, dict):
         return
-    out = on_prompt(data)
+    event = data.get("hook_event_name") or ("UserPromptSubmit" if "prompt" in data else "")
+    if event in ("SessionStart", "PostModelSwitch"):
+        on_model(data, event)
+        return
+    out = on_prompt(data) if event == "UserPromptSubmit" else None
     if out:
         sys.stdout.write(json.dumps(out))
 
