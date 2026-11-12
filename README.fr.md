@@ -74,7 +74,7 @@ Si tu changes le modèle d'une vitesse, change aussi `model:` dans le fichier `a
 
 ## Licence
 
-Libre d'utilisation, de modification et de redistribution pour n'importe quel usage, à condition de citer le projet d'origine : *Based on gearbox by Robocnop - https://github.com/Robocnop/gearbox*. Voir [LICENSE](LICENSE) (en anglais).
+[MIT](LICENSE) © 2026 Robocnop
 
 ## Limites connues
 

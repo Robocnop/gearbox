@@ -74,7 +74,7 @@ If you change the model of a gear, also change `model:` in the matching `agents/
 
 ## License
 
-Free to use, modify and redistribute for any purpose, as long as you credit the original project: *Based on gearbox by Robocnop - https://github.com/Robocnop/gearbox*. See [LICENSE](LICENSE).
+[MIT](LICENSE) © 2026 Robocnop
 
 ## Known limitations
 
