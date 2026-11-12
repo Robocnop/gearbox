@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -54,6 +55,9 @@ DEFAULTS = {
               "distribué", "sécurité", "security", "vulnérab", "vulnerab", "threat model", "cryptograph",
               "preuve", "proof", "trade-off", "scalab"],
     },
+    "negations": ["pas besoin", "pas la peine", "inutile", "sans", "ne pas", "ne fais pas", "ne faites pas",
+                  "jamais", "au lieu de", "don't", "dont", "do not", "never", "no need", "without", "avoid",
+                  "skip", "instead of"],
     "length_chars": {"3": 800, "4": 2500},
     "files_mentioned": {"3": 3, "4": 7},
     "file_extensions": ["py", "js", "jsx", "ts", "tsx", "json", "md", "lua", "luau", "cs", "java", "kt", "go",
@@ -118,6 +122,7 @@ def validate(raw):
     scalar("allow_fable", lambda v: isinstance(v, bool))
     scalar("stack_trace_gear", _int(1, 4))
     scalar("file_extensions", _strs)
+    scalar("negations", _strs)
     scalar("stack_trace_patterns", _regexes)
     table("zero_gear", {"short_max_chars": _int(0, 100000), "question_max_chars": _int(0, 100000),
                         "question_starters": _strs, "action_verbs": _strs})
@@ -184,69 +189,104 @@ def decision(cfg, gear, reason, forced=False):
     }
 
 
+FENCE = re.compile(r"```.*?(?:```|\Z)", re.S)
+
+
+def norm(s):
+    """Lower-case, strip accents, unify apostrophes, so FR/EN matching ignores them."""
+    s = unicodedata.normalize("NFKD", s.replace("’", "'").replace("‘", "'"))
+    return "".join(c for c in s if not unicodedata.combining(c)).casefold()
+
+
+def hit(text, word):
+    """True if `word` (accent/case-insensitive) occurs at the start of a word in normalized text."""
+    return re.search(r"(?<!\w)" + re.escape(norm(word)), text) is not None
+
+
+def has_trace(text, patterns):
+    return any(re.search(p, text, re.M) for p in patterns)
+
+
+def strip_traces(text, patterns):
+    """Drop stack-trace blocks: from the first matching line up to the next blank line."""
+    out, skipping = [], False
+    for line in text.splitlines():
+        if any(re.search(p, line) for p in patterns):
+            skipping = True
+        elif not line.strip():
+            skipping = False
+        if not skipping:
+            out.append(line)
+    return "\n".join(out)
+
+
+def strip_negations(text, phrases):
+    """Remove negated fragments ("pas besoin de tester", "don't refactor") from normalized text."""
+    alts = sorted({r"\s+".join(re.escape(w) for w in norm(p).split()) for p in phrases if norm(p).strip()},
+                  key=len, reverse=True)
+    if not alts:
+        return text
+    return re.sub(r"(?<!\w)(?:" + "|".join(alts) + r")(?:\s+[\w'-]+){1,2}", " ", text)
+
+
 def classify(prompt, cfg=None):
     cfg = cfg or load_config()
-    text = prompt.strip()
-    low = text.lower()
+    raw = prompt.strip()
+    pats = cfg["stack_trace_patterns"]
+    trace = has_trace(raw, pats)  # a stack trace is only a boolean signal
+    clean = strip_traces(FENCE.sub(" ", raw), pats).strip()  # no code blocks, no traces
+    nk = norm(clean)
+    kw = strip_negations(nk, cfg["negations"])  # text used for keyword / verb detection
+    n = len(clean)
     reasons = []
 
-    # 0) Pas de délégation : question, ou prompt court sans verbe d'action.
-    z = cfg.get("zero_gear", {})
-    n = len(text)
-    starters = z.get("question_starters", [])
-    is_q = text.endswith("?") or any(
-        re.match(re.escape(s.lower()) + r"\b", low) for s in starters)
-    if is_q and n <= z.get("question_max_chars", 400):
+    # 0) No delegation: a question, or a short prompt without action verb.
+    z = cfg["zero_gear"]
+    is_q = clean.endswith("?") or any(re.match(re.escape(norm(s)) + r"\b", nk) for s in z["question_starters"])
+    if is_q and n <= z["question_max_chars"]:
         return decision(cfg, 0, t("g0_question"))
-    verbs = z.get("action_verbs", [])
-    if n < z.get("short_max_chars", 60) and not any(
-            re.search(r"(?<!\w)" + re.escape(v.lower()), low) for v in verbs):
+    if n < z["short_max_chars"] and not trace and not any(hit(kw, v) for v in z["action_verbs"]):
         return decision(cfg, 0, t("g0_short"))
 
-    # 1) Mots-clés : la vitesse la plus haute qui matche l'emporte (match en début de mot).
-    gear = None
+    # 1) Keywords: the highest matching gear wins.
+    level = None
     for g in (4, 3, 2, 1):
-        hits = [k for k in cfg["keywords"].get(str(g), [])
-                if re.search(r"(?<!\w)" + re.escape(k.lower()), low)]
+        hits = [k for k in cfg["keywords"][str(g)] if hit(kw, k)]
         if hits:
-            gear = g
+            level = g
             reasons.append(t("kw", x=", ".join(hits[:3])))
             break
-    if gear is None:
-        if len(text) < cfg.get("short_prompt_chars", 40):
-            gear = 1
+    if level is None:
+        if n < cfg["short_prompt_chars"]:
+            level = 1
             reasons.append(t("short"))
         else:
-            gear = cfg.get("default_gear", 2)
+            level = cfg["default_gear"]
             reasons.append(t("nosignal"))
 
-    # 2) Signaux qui ne peuvent que monter la vitesse.
+    # 2) Signals that can only raise the gear.
     def bump(min_gear, why):
-        nonlocal gear
-        if min_gear > gear:
-            gear = min_gear
+        nonlocal level
+        if min_gear > level:
+            level = min_gear
             reasons.append(why)
 
-    n = len(text)
     for g in (4, 3):
-        lim = cfg.get("length_chars", {}).get(str(g))
-        if lim and n >= lim:
-            bump(g, t("length", n=n))
+        if len(raw) >= cfg["length_chars"][str(g)]:
+            bump(g, t("length", n=len(raw)))
             break
 
-    exts = "|".join(re.escape(e) for e in cfg.get("file_extensions", []))
-    if exts:
-        files = set(re.findall(r"[\w\-./\\]*\w\.(?:" + exts + r")(?!\w)", low))
-        for g in (4, 3):
-            lim = cfg.get("files_mentioned", {}).get(str(g))
-            if lim and len(files) >= lim:
-                bump(g, t("files", n=len(files)))
-                break
+    exts = "|".join(re.escape(e) for e in cfg["file_extensions"])
+    files = set(re.findall(r"[\w\-./\\]*\w\.(?:" + exts + r")(?!\w)", nk))
+    for g in (4, 3):
+        if len(files) >= cfg["files_mentioned"][str(g)]:
+            bump(g, t("files", n=len(files)))
+            break
 
-    if any(re.search(p, text, re.M) for p in cfg.get("stack_trace_patterns", [])):
-        bump(cfg.get("stack_trace_gear", 3), t("trace"))
+    if trace:
+        bump(cfg["stack_trace_gear"], t("trace"))
 
-    return decision(cfg, gear, " ; ".join(reasons))
+    return decision(cfg, level, " ; ".join(reasons))
 
 
 if __name__ == "__main__":

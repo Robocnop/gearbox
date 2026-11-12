@@ -21,6 +21,7 @@
     "3": ["architecture", "multi-fichier", "multi-file", "plusieurs fichiers", "multiple files", "across", "migration", "migrate", "performance", "optimi", "race condition", "deadlock", "memory leak", "fuite mémoire", "intermittent", "flaky", "concurren"],
     "4": ["from scratch", "de zéro", "system design", "conception système", "conçois", "distributed", "distribué", "sécurité", "security", "vulnérab", "vulnerab", "threat model", "cryptograph", "preuve", "proof", "trade-off", "scalab"]
   },
+  "negations": ["pas besoin", "pas la peine", "inutile", "sans", "ne pas", "ne fais pas", "ne faites pas", "jamais", "au lieu de", "don't", "dont", "do not", "never", "no need", "without", "avoid", "skip", "instead of"],
   "length_chars": { "3": 800, "4": 2500 },
   "files_mentioned": { "3": 3, "4": 7 },
   "file_extensions": ["py", "js", "jsx", "ts", "tsx", "json", "md", "lua", "luau", "cs", "java", "kt", "go", "rs", "c", "h", "cpp", "hpp", "rb", "php", "html", "css", "scss", "sql", "sh", "ps1", "yml", "yaml", "toml", "xml", "vue", "swift"],
