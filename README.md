@@ -1,55 +1,69 @@
 # gearbox
 
-Boîte de vitesses automatique pour Claude Code : chaque prompt est classé localement (zéro appel API) et orienté vers le bon modèle et le bon niveau d'effort.
+**English** | [Français](README.fr.md)
 
-| Vitesse | Agent | Modèle | Effort | Cas typiques |
+Automatic gear shifting for Claude Code: every prompt is classified locally (zero API calls) and routed to the right model and effort level.
+
+| Gear | Agent | Model | Effort | Typical work |
 |---|---|---|---|---|
-| 1 | `gear-haiku` | Haiku 5.5 | low | typo, renommage, formatage |
-| 2 | `gear-sonnet` | Sonnet 5.5 | medium | bug simple, tests, petit refactor |
-| 3 | `gear-opus` | Opus 5.5 | high | architecture, multi-fichiers, débogage difficile |
-| 4 | `gear-fable` | Fable 5.2 | xhigh | conception système, from scratch, sécurité |
+| 1 | `gear-haiku` | Haiku 5.5 | low | typo, rename, formatting |
+| 2 | `gear-sonnet` | Sonnet 5.5 | medium | simple bug, tests, small refactor |
+| 3 | `gear-opus` | Opus 5.5 | high | architecture, multi-file changes, hard debugging |
+| 4 | `gear-fable` | Fable 5.2 | xhigh | system design, from scratch, security |
 
-## Installation (locale)
+## Install
 
-Prérequis : `python` (3.8+) dans le PATH.
+Requires `python` (3.8+) on your PATH.
+
+From GitHub:
 
 ```
-/plugin marketplace add C:\Users\roboc\Documents\gearbox
-/plugin install gearbox@gearbox-local
+/plugin marketplace add Robocnop/gearbox
+/plugin install gearbox@gearbox
 ```
 
-Ou, pour un essai sans installation : `claude --plugin-dir C:\Users\roboc\Documents\gearbox`
+From a local clone:
 
-## Fonctionnement
+```
+git clone https://github.com/Robocnop/gearbox.git
+/plugin marketplace add ./gearbox
+/plugin install gearbox@gearbox
+```
 
-1. Le hook `UserPromptSubmit` passe le prompt à `scripts/classify.py`.
-2. Le classifieur renvoie `{gear, model, effort, reason}` selon `gears.json`.
-3. Le hook injecte une ligne de contexte : `[gearbox] vitesse 2 (auto) → déléguer à l'agent gearbox:gear-sonnet …`.
-4. La session principale délègue le travail à l'agent indiqué, qui tourne sur son propre modèle.
+To try it without installing: `claude --plugin-dir ./gearbox`
 
-Commandes :
-- `/gear <1-4|auto>` — force une vitesse, ou repasse en automatique.
-- `/gear-why` — affiche la décision et la raison du dernier prompt.
+## How it works
 
-État : `~/.claude/gearbox/state.json`.
+1. The `UserPromptSubmit` hook sends your prompt to `scripts/classify.py`.
+2. The classifier returns `{gear, model, effort, reason}` based on `gears.json`.
+3. The hook injects one line of context: `[gearbox] vitesse 2 (auto) → déléguer à l'agent gearbox:gear-sonnet …`.
+4. The main session delegates the work to that agent, which runs on its own model.
 
-## Modifier `gears.json`
+Commands:
 
-- `gears` : modèle, agent et effort de chaque vitesse.
-- `keywords` : mots-clés par vitesse (match en début de mot, insensible à la casse ; la vitesse la plus haute gagne).
-- `default_gear` / `short_prompt_chars` : vitesse sans mot-clé (prompt très court → 1).
-- `length_chars`, `files_mentioned` : seuils qui font monter en vitesse 3 / 4.
-- `file_extensions` : extensions comptées comme « fichier mentionné ».
-- `stack_trace_patterns` / `stack_trace_gear` : regex de détection de stack trace et vitesse minimale associée.
+- `/gear <1-4|auto>` — force a gear, or go back to automatic.
+- `/gear-why` — show the decision and the reason for the last prompt.
 
-Tester une règle : `echo "mon prompt" | python scripts/classify.py`
+State is stored in `~/.claude/gearbox/state.json`.
 
-Si tu changes le modèle d'une vitesse, change aussi `model:` dans `agents/gear-*.md`.
+## Customising `gears.json`
 
-## Limites connues
+- `gears`: model, agent and effort for each gear.
+- `keywords`: keywords per gear (matched at the start of a word, case-insensitive; the highest matching gear wins). English and French keywords are included.
+- `default_gear` / `short_prompt_chars`: gear used when no keyword matches (a very short prompt goes to gear 1).
+- `length_chars`, `files_mentioned`: thresholds that shift up to gear 3 or 4.
+- `file_extensions`: extensions counted as a "mentioned file".
+- `stack_trace_patterns` / `stack_trace_gear`: regexes that detect a stack trace, and the minimum gear it triggers.
 
-- **Un hook ne peut pas changer le modèle de la session principale.** gearbox ne fait que *suggérer* une délégation ; c'est le modèle principal qui décide de suivre (il le fait en général, sans garantie).
-- L'économie n'existe que si la session principale tourne sur un modèle au moins aussi cher que l'agent visé ; chaque délégation démarre à froid (l'agent relit le contexte).
-- Le champ `effort:` des agents dépend de la version de Claude Code ; s'il est ignoré, la consigne d'effort du prompt système reste active.
-- Classifieur purement heuristique : il se trompe sur les prompts ambigus → `/gear` pour corriger.
-- Les prompts commençant par `/` (slash commands) ne sont pas classés.
+Test a rule: `echo "my prompt" | python scripts/classify.py`
+
+If you change the model of a gear, also change `model:` in the matching `agents/gear-*.md`.
+
+## Known limitations
+
+- **A hook cannot change the model of the main session.** gearbox only *suggests* a delegation; the main model decides whether to follow it (it usually does, with no guarantee).
+- You only save quota when the main session runs on a model at least as expensive as the target agent, and every delegation starts cold (the agent re-reads the context).
+- The agents' `effort:` field depends on your Claude Code version; if it is ignored, the effort guidance in each agent's system prompt still applies.
+- The classifier is purely heuristic and will misjudge ambiguous prompts; use `/gear` to override.
+- Prompts starting with `/` (slash commands) are not classified.
+- The injected context line, agent prompts and command output are currently written in French.
