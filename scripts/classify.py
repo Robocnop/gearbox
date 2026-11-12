@@ -4,21 +4,158 @@
 stdin : le prompt.  stdout : JSON {gear, model, effort, reason, ...}.
 Les règles vivent dans gears.json (à la racine du plugin).
 """
+import copy
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import gear  # noqa: E402
 from i18n import t  # noqa: E402
 
 CONFIG = Path(__file__).resolve().parent.parent / "gears.json"
 RANK = {"haiku": 1, "sonnet": 2, "opus": 3, "fable": 4}
 
 
-def load_config(path=CONFIG):
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+# Built-in defaults: used for any missing/invalid key, or when gears.json is unusable.
+# Kept identical to the shipped gears.json (a test enforces it).
+DEFAULTS = {
+    "gears": {
+        "1": {"model": "haiku", "model_name": "Haiku 5.5", "agent": "gear-haiku", "effort": "low"},
+        "2": {"model": "sonnet", "model_name": "Sonnet 5.5", "agent": "gear-sonnet", "effort": "medium"},
+        "3": {"model": "opus", "model_name": "Opus 5.5", "agent": "gear-opus", "effort": "high"},
+        "4": {"model": "fable", "model_name": "Fable 5.2", "agent": "gear-fable", "effort": "xhigh"},
+    },
+    "default_gear": 2,
+    "short_prompt_chars": 40,
+    "main_model": "sonnet",
+    "allow_fable": False,
+    "zero_gear": {
+        "short_max_chars": 60,
+        "question_max_chars": 400,
+        "question_starters": ["quoi", "comment", "pourquoi", "quand", "quel", "quelle", "quels", "quelles",
+                              "qui", "est-ce", "what", "how", "why", "when", "where", "which", "who"],
+        "action_verbs": ["fix", "add", "create", "write", "make", "build", "implement", "refactor", "rename",
+                         "remove", "delete", "update", "change", "run", "test", "debug", "install", "generate",
+                         "optimi", "migrat", "corrige", "ajoute", "crée", "cree", "écris", "ecris", "fais",
+                         "implémente", "implemente", "supprime", "modifie", "lance", "teste", "renomme",
+                         "génère", "genere", "conçois", "concois", "construis", "installe", "migre"],
+    },
+    "keywords": {
+        "1": ["typo", "rename", "renomme", "format", "lint", "indent", "faute", "orthograph", "whitespace"],
+        "2": ["bug", "test", "refactor", "erreur", "error", "implement", "implémente", "ajoute", "function",
+              "fonction", "endpoint"],
+        "3": ["architecture", "multi-fichier", "multi-file", "plusieurs fichiers", "multiple files", "across",
+              "migration", "migrate", "performance", "optimi", "race condition", "deadlock", "memory leak",
+              "fuite mémoire", "intermittent", "flaky", "concurren"],
+        "4": ["from scratch", "de zéro", "system design", "conception système", "conçois", "distributed",
+              "distribué", "sécurité", "security", "vulnérab", "vulnerab", "threat model", "cryptograph",
+              "preuve", "proof", "trade-off", "scalab"],
+    },
+    "length_chars": {"3": 800, "4": 2500},
+    "files_mentioned": {"3": 3, "4": 7},
+    "file_extensions": ["py", "js", "jsx", "ts", "tsx", "json", "md", "lua", "luau", "cs", "java", "kt", "go",
+                        "rs", "c", "h", "cpp", "hpp", "rb", "php", "html", "css", "scss", "sql", "sh", "ps1",
+                        "yml", "yaml", "toml", "xml", "vue", "swift"],
+    "stack_trace_gear": 3,
+    "stack_trace_patterns": [r"Traceback \(most recent call last\)", r'File ".+", line \d+',
+                             r"^\s+at .+[(:]\d+", r"Exception in thread", r"^panic: ", r"error\[E\d+\]",
+                             r"stack traceback:"],
+}
+
+
+def _int(lo, hi):
+    return lambda v: isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi
+
+
+def _strs(v):
+    return isinstance(v, list) and all(isinstance(x, str) and x.strip() for x in v)
+
+
+def _regexes(v):
+    if not _strs(v):
+        return False
+    try:
+        for p in v:
+            re.compile(p)
+    except re.error:
+        return False
+    return True
+
+
+def validate(raw):
+    """Merge raw (parsed gears.json) over DEFAULTS. Returns (config, warnings)."""
+    cfg, warns = copy.deepcopy(DEFAULTS), []
+    if not isinstance(raw, dict):
+        return cfg, ["gears.json is not a JSON object"]
+
+    def scalar(key, ok):
+        if key not in raw:
+            warns.append(f"missing {key}")
+        elif ok(raw[key]):
+            cfg[key] = copy.deepcopy(raw[key])
+        else:
+            warns.append(f"invalid {key}")
+
+    def table(key, checks):
+        src = raw.get(key)
+        if not isinstance(src, dict):
+            warns.append(f"invalid {key}")
+            return
+        for k, ok in checks.items():
+            if k not in src:
+                warns.append(f"missing {key}.{k}")
+            elif ok(src[k]):
+                cfg[key][k] = copy.deepcopy(src[k])
+            else:
+                warns.append(f"invalid {key}.{k}")
+
+    scalar("default_gear", _int(1, 4))
+    scalar("short_prompt_chars", _int(0, 100000))
+    scalar("main_model", lambda v: isinstance(v, str) and (v == "" or v in RANK))
+    scalar("allow_fable", lambda v: isinstance(v, bool))
+    scalar("stack_trace_gear", _int(1, 4))
+    scalar("file_extensions", _strs)
+    scalar("stack_trace_patterns", _regexes)
+    table("zero_gear", {"short_max_chars": _int(0, 100000), "question_max_chars": _int(0, 100000),
+                        "question_starters": _strs, "action_verbs": _strs})
+    table("keywords", {k: _strs for k in "1234"})
+    table("length_chars", {k: _int(1, 10 ** 6) for k in "34"})
+    table("files_mentioned", {k: _int(1, 1000) for k in "34"})
+
+    gears = raw.get("gears")
+    if isinstance(gears, dict):
+        for k in "1234":
+            entry = gears.get(k)
+            if not isinstance(entry, dict):
+                warns.append(f"invalid gears.{k}")
+                continue
+            for f in ("model", "model_name", "agent", "effort"):
+                v = entry.get(f)
+                if isinstance(v, str) and v.strip() and (f != "model" or v in RANK):
+                    cfg["gears"][k][f] = v
+                else:
+                    warns.append(f"invalid gears.{k}.{f}")
+    else:
+        warns.append("invalid gears")
+    return cfg, warns
+
+
+def load_config(path=None):
+    """Never raises: a missing/corrupt gears.json falls back to DEFAULTS (warnings go to the log)."""
+    path = path or os.environ.get("GEARBOX_CONFIG") or CONFIG
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception as e:
+        gear.log(f"gears.json unusable ({type(e).__name__}): built-in defaults used")
+        return copy.deepcopy(DEFAULTS)
+    cfg, warns = validate(raw)
+    for w in warns:
+        gear.log(f"gears.json: {w} -> default used")
+    return cfg
 
 
 def decision(cfg, gear, reason, forced=False):
