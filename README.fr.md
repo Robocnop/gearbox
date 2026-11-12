@@ -72,6 +72,10 @@ Tester une règle : `echo "mon prompt" | python scripts/classify.py`. Lancer les
 
 Si tu changes le modèle d'une vitesse, change aussi `model:` dans le fichier `agents/gear-*.md` correspondant.
 
+## Licence
+
+Libre d'utilisation, de modification et de redistribution pour n'importe quel usage, à condition de citer le projet d'origine : *Based on gearbox by Robocnop - https://github.com/Robocnop/gearbox*. Voir [LICENSE](LICENSE) (en anglais).
+
 ## Limites connues
 
 - **Un hook ne peut pas changer le modèle de la session principale.** gearbox ne fait que *suggérer* une délégation ; c'est le modèle principal qui décide de la suivre (il le fait en général, sans garantie).

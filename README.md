@@ -72,6 +72,10 @@ Test a rule: `echo "my prompt" | python scripts/classify.py`. Run the test suite
 
 If you change the model of a gear, also change `model:` in the matching `agents/gear-*.md`.
 
+## License
+
+Free to use, modify and redistribute for any purpose, as long as you credit the original project: *Based on gearbox by Robocnop - https://github.com/Robocnop/gearbox*. See [LICENSE](LICENSE).
+
 ## Known limitations
 
 - **A hook cannot change the model of the main session.** gearbox only *suggests* a delegation; the main model decides whether to follow it (it usually does, with no guarantee).
