@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+# local data must never be committed (the plugin keeps it in ~/.claude/gearbox/)
+state.json
+state.tmp
+*.log
